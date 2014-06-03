@@ -115,6 +115,10 @@ struct request {
 	union {
 		void *elevator_private[3];
 		struct {
+			struct io_cq            *icq;
+			void                    *priv[2];
+        } elv;
+		struct {
 			unsigned int		seq;
 			struct list_head	list;
 		} flush;
@@ -162,6 +166,7 @@ struct request {
 	unsigned int timeout;
 	int retries;
 
+	struct list_head  icq_list;
 	/*
 	 * completion callback.
 	 */
@@ -268,7 +273,8 @@ struct request_queue
 	struct list_head	queue_head;
 	struct request		*last_merge;
 	struct elevator_queue	*elevator;
-
+	
+	struct list_head icq_list;
 	/*
 	 * the queue request freelist, one for reads and one for writes
 	 */
@@ -297,6 +303,12 @@ struct request_queue
 	struct delayed_work	delay_work;
 
 	struct backing_dev_info	backing_dev_info;
+	
+	/*
+     * ida allocated id for this queue.  Used to index queues from
+     * ioctx.
+     */
+    int                     id;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.

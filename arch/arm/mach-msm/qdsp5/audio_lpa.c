@@ -1,7 +1,7 @@
 
 /* audio_lpa.c - low power audio driver
  *
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Based on the PCM decoder driver in arch/arm/mach-msm/qdsp5/audio_pcm.c
  *
@@ -555,7 +555,9 @@ static void audpcm_async_flush(struct audio *audio)
 	struct audpcm_buffer_node *buf_node;
 	struct list_head *ptr, *next;
 	union msm_audio_event_payload payload;
+	unsigned long flags;
 
+	spin_lock_irqsave(&audio->dsp_lock, flags);
 	MM_DBG("\n"); /* Macro prints the file name and function */
 	list_for_each_safe(ptr, next, &audio->out_queue) {
 		buf_node = list_entry(ptr, struct audpcm_buffer_node, list);
@@ -568,6 +570,7 @@ static void audpcm_async_flush(struct audio *audio)
 	audio->drv_status &= ~ADRV_STATUS_OBUF_GIVEN;
 	audio->out_needed = 0;
 	atomic_set(&audio->out_bytes, 0);
+	spin_unlock_irqrestore(&audio->dsp_lock, flags);
 }
 static void audio_ioport_reset(struct audio *audio)
 {
@@ -923,6 +926,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	if (cmd == AUDIO_GET_STATS) {
 		struct msm_audio_stats stats;
+		memset(&stats, 0, sizeof(stats));
 		stats.byte_count = audpp_avsync_byte_count(audio->dec_id);
 		stats.sample_count = audpp_avsync_sample_count(audio->dec_id);
 		if (copy_to_user((void *) arg, &stats, sizeof(stats)))
@@ -1034,6 +1038,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	case AUDIO_GET_CONFIG: {
 		struct msm_audio_config config;
+		memset(&config, 0, sizeof(config));
 		config.buffer_count = audio->buffer_count;
 		config.buffer_size = audio->buffer_size;
 		config.sample_rate = audio->out_sample_rate;

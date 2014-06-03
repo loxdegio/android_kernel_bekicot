@@ -192,10 +192,10 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-#ARCH		?= $(SUBARCH)
 ARCH		= arm
-#CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
-CROSS_COMPILE    = /home/lox/Android_Sources/Cyanogenmod/10.2/Platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin/arm-linux-androideabi-
+CROSS_COMPILE	= /home/lox/Android_Sources/Cyanogenmod/10.2/Platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin/arm-linux-androideabi-
+
+
 
 
 # Architecture as present in compile.h
@@ -354,14 +354,13 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-
-OFLAGS   = -O3 -march=armv7-a -mtune=cortex-a5 -mfpu=neon		  
-		  
-CFLAGS_MODULE   = $(OFLAGS)
-AFLAGS_MODULE   = $(OFLAGS)
-LDFLAGS_MODULE  =
-CFLAGS_KERNEL   = $(OFLAGS)
-AFLAGS_KERNEL   = $(OFLAGS)
+OFLAGS		= -O3 -mtune=cortex-a5 -march=armv7-a -mfpu=neon-vfpv4 -funsafe-math-optimizations -fomit-frame-pointer -ffast-math -funsafe-loop-optimizations
+MODFLAGS	= -DMODULE $(OFLAGS)
+CFLAGS_MODULE   = $(MODFLAGS)
+AFLAGS_MODULE   = $(MODFLAGS)
+LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
+CFLAGS_KERNEL	= $(OFLAGS)
+AFLAGS_KERNEL	= $(OFLAGS)
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
@@ -378,7 +377,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fno-delete-null-pointer-checks $(OFLAGS)
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -571,7 +570,7 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
-KBUILD_CFLAGS	+= -O2
+KBUILD_CFLAGS	+= -O3
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile

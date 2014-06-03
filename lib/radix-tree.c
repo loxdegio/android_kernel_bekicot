@@ -242,6 +242,21 @@ out:
 EXPORT_SYMBOL(radix_tree_preload);
 
 /*
+ * The same as above function, except we don't guarantee preloading happens.
+ * We do it, if we decide it helps. On success, return zero with preemption
+ * disabled. On error, return -ENOMEM with preemption not disabled.
+ */
+int radix_tree_maybe_preload(gfp_t gfp_mask)
+{
+        if (gfp_mask & __GFP_WAIT)
+                return radix_tree_preload(gfp_mask);
+        /* Preloading doesn't help anything with this gfp mask, skip it */
+        preempt_disable();
+        return 0;
+}
+EXPORT_SYMBOL(radix_tree_maybe_preload);
+
+/*
  *	Return the maximum key which can be store into a
  *	radix tree with height HEIGHT.
  */
