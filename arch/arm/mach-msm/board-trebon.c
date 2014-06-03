@@ -64,12 +64,17 @@
 #include <linux/gp2a.h>
 #endif
 
+#ifndef CONFIG_MSM_CAMERA
+#define CONFIG_MSM_CAMERA
+#endif
+
 #ifdef CONFIG_FORCE_FAST_CHARGE
 #include <linux/fastchg.h>
 #endif
 
 #define _CONFIG_MACH_JENA // Temporary flag
 #define _CONFIG_MACH_TREBON // Temporary flag
+#define ADSP_RPC_PROG           0x3000000a
 
 #define PMEM_KERNEL_EBI1_SIZE	0x3A000
 #define MSM_PMEM_AUDIO_SIZE	0x1F4000 //0x5B000
@@ -110,14 +115,6 @@ static int wlan_setup_ldo_33v(int input_flag, int on);
 
 #define GPIO_JACK_S_35	48
 #define GPIO_SEND_END	92
-
-#ifdef CONFIG_ION_MSM
-#define MSM_ION_HEAP_NUM 4
-static struct platform_device ion_dev;
-static int msm_ion_camera_size;
-static int msm_ion_audio_size;
-static int msm_ion_sf_size;
-#endif
 
 static struct sec_jack_zone jack_zones[] = {
 	[0] = {
@@ -1487,17 +1484,13 @@ void trebon_chg_connected(enum chg_type chgtype)
 	switch (chgtype) {
 	case USB_CHG_TYPE__SDP:
 #ifdef CONFIG_FORCE_FAST_CHARGE
-		if (force_fast_charge == 1) {
-			ret = msm_proc_comm(PCOM_CHG_USB_IS_CHARGER_CONNECTED,
-					data1, data2);
-		} else {
-			ret = msm_proc_comm(PCOM_CHG_USB_IS_PC_CONNECTED,
-					data1, data2);
-		}
-#else
-		ret = msm_proc_comm(PCOM_CHG_USB_IS_PC_CONNECTED,
+    	if (force_fast_charge == 1)
+			ret = msm_proc_comm(PCOM_CHG_USB_IS_CHARGER_CONNECTED, 
 				data1, data2);
+		else
 #endif
+		ret = msm_proc_comm(PCOM_CHG_USB_IS_PC_CONNECTED, 
+			data1, data2);
 		break;
 	case USB_CHG_TYPE__WALLCHARGER:
 		ret = msm_proc_comm(PCOM_CHG_USB_IS_CHARGER_CONNECTED,
@@ -1711,19 +1704,31 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 
 #ifdef CONFIG_ARCH_MSM7X27A
 #define MSM_PMEM_MDP_SIZE       0x1800000 //25MB default: 0x1DD1000 (29MB)
+#define MSM7x25A_MSM_PMEM_MDP_SIZE       0x1500000 //22MB
+
 #define MSM_PMEM_ADSP_SIZE      0x900000 // ~9MB
+#define MSM_ION_VIDC_SIZE       0x1200000 // 18MB
+#define MSM7x25A_MSM_PMEM_ADSP_SIZE      0xB91000 //12MB
+
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-/* prim = 320 x 480 x 4(bpp) x 3(pages) */
-#define MSM_FB_SIZE             320 * 480 * 4 * 3
+#define MSM_FB_SIZE		0x1C2000
+#define MSM7x25A_MSM_FB_SIZE    0x1C2000
+#define MSM8x25_MSM_FB_SIZE	0x1C2000
 #else
-/* prim = 320 x 480 x 4(bpp) x 2(pages) */
-#define MSM_FB_SIZE             320 * 480 * 4 * 2
-#endif /* CONFIG_FB_MSM_TRIPLE_BUFFER */
-#else
-#define MSM_PMEM_MDP_SIZE       0x1DD1000
-#define MSM_PMEM_ADSP_SIZE      0x1000000
-#define MSM_FB_SIZE             0x195000
-#endif /* CONFIG_ARCH_MSM7X27A */
+#define MSM_FB_SIZE		0x1C2000
+#define MSM7x25A_MSM_FB_SIZE	0x12C000
+#define MSM8x25_MSM_FB_SIZE	0x1C2000
+#endif
+#endif
+
+#ifdef CONFIG_ION_MSM
+#define MSM_ION_HEAP_NUM        4
+static struct platform_device ion_dev;
+static int msm_ion_camera_size;
+static int msm_ion_audio_size;
+static int msm_ion_sf_size;
+#endif
+
 
 static struct android_usb_platform_data android_usb_pdata = {
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,

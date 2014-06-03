@@ -51,6 +51,10 @@ static struct wake_lock lpm_wake_lock;
 static struct wake_lock fuel_alert_wake_lock;
 static int fuel_alert_det;
 
+#if defined CONFIG_BLX
+#include <linux/blx.h>
+#endif
+
 #ifdef DEBUG
 #undef pr_debug
 #define pr_debug pr_info
@@ -283,7 +287,7 @@ const int temp_table[][2] = {
 
 #ifdef CONFIG_MACH_GEIM
 #define BATT_FULL_CHARGING_CURRENT	90
-#define BATT_FULL_CHARGING_VOLTAGE      4180
+#define BATT_FULL_CHARGING_VOLTAGE  4180
 #else
 #define BATT_FULL_CHARGING_CURRENT	90
 #define BATT_FULL_CHARGING_VOLTAGE      4180
@@ -1854,7 +1858,7 @@ static int msm_batt_check_full_charging(int chg_current_adc)
 {
 	static unsigned int time_after_under_tsh;
 
-#if defined(CONFIG_MACH_JENA)
+#if defined(CONFIG_MACH_TREBON)
 	if (msm_batt_info.charging_source == NO_CHG)
 		return 0;
 #else
@@ -1868,21 +1872,29 @@ static int msm_batt_check_full_charging(int chg_current_adc)
 			__func__, msm_batt_info.batt_recharging);
 		msm_batt_info.batt_full_check = 1;
 		msm_batt_info.batt_recharging = 0;
-#if defined(CONFIG_MACH_JENA)
+#if defined(CONFIG_MACH_TREBON)
+#ifdef CONFIG_BLX
+		if (get_charginglimit() != MAX_CHARGINGLIMIT && msm_batt_info.battery_level >= get_charginglimit()){
+			msm_batt_info.batt_status = POWER_SUPPLY_STATUS_DISCHARGING;
+		}else{
+#endif
 		if (msm_batt_info.battery_vol >= 4100) {
 			msm_batt_info.batt_status = POWER_SUPPLY_STATUS_FULL;
 			msm_batt_info.batt_capacity = 100;
 		} else
 			msm_batt_info.batt_status = POWER_SUPPLY_STATUS_DISCHARGING;
-#else
+#ifdef CONFIG_BLX
+		}
+#endif
+#else /* !CONFIG_MACH_TREBON */
 		msm_batt_info.batt_status = POWER_SUPPLY_STATUS_FULL;
 		msm_batt_info.batt_capacity = 100;
-#endif
+#endif /* CONFIG_MACH_TREBON */
 		msm_batt_chg_en(STOP_CHARGING);
 		return 1;
 	}
 
-#if defined(CONFIG_MACH_JENA)
+#if defined(CONFIG_MACH_TREBON)
 	if (chg_current_adc == 0)
 		return 0;
 #endif
@@ -1941,7 +1953,7 @@ static int msm_batt_check_recharging(void)
 			pr_info("[BATT] %s: Recharging ! (voltage1 = %d)\n",
 				__func__, msm_batt_info.battery_vol);
 			msm_batt_info.batt_recharging = 1;
-#if defined(CONFIG_MACH_JENA)
+#if defined(CONFIG_MACH_TREBON)
 		if (msm_batt_info.battery_vol < 4000)
 			msm_batt_info.batt_status = POWER_SUPPLY_STATUS_CHARGING;
 #endif
@@ -1961,7 +1973,7 @@ static int msm_batt_check_recharging(void)
 			pr_info("[BATT] %s: Recharging ! (voltage2 = %d)\n",
 				__func__, msm_batt_info.battery_vol);
 			msm_batt_info.batt_recharging = 1;
-#if defined(CONFIG_MACH_JENA)
+#if defined(CONFIG_MACH_TREBON)
 		if (msm_batt_info.battery_vol < 4000)
 			msm_batt_info.batt_status = POWER_SUPPLY_STATUS_CHARGING;
 #endif

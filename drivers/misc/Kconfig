@@ -672,6 +672,12 @@ config PN544
         default n
         help
           NXP PN544 Near Field Communication controller support.
+          
+config BLX
+       bool "Support for Battery Life eXtender"
+       default y
+       help
+         Say Y here to enable Battery Life eXtender
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
