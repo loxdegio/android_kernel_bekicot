@@ -216,14 +216,8 @@ unsigned int ignore_idle)
 		priv->no_switch_cnt = 0;
 	}
 	
-	idle = priv->bin.total_time - priv->bin.busy_time;
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-	idle = (idle > 0) ? idle : 0;
-	val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
-	if (val)
-		idle = stats.total_time - stats.busy_time;
-	idle = (idle > 0) ? idle : 0;
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 	if (priv->governor == TZ_GOVERNOR_SIMPLE)
 		val = simple_governor(device, idle);
@@ -231,6 +225,10 @@ unsigned int ignore_idle)
 		val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
 #else
 	val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
+#endif
+	if (val)
+		idle = stats.total_time - stats.busy_time;
+	idle = (idle > 0) ? idle : 0;
 	kgsl_pwrctrl_pwrlevel_change(device,
 	pwr->active_pwrlevel + val);
 	//pr_info("TZ idle stat: %d, TZ PL: %d, TZ out: %d\n",
