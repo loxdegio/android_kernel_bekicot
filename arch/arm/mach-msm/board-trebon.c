@@ -44,7 +44,7 @@
 #include <linux/power_supply.h>
 #include <linux/regulator/consumer.h>
 #include <mach/rpc_pmapp.h>
-#include <mach/msm_battery.h>
+#include <mach/msm_battery_jena.h>
 #include <linux/smsc911x.h>
 #include <linux/ion.h>
 #include "devices.h"
@@ -64,17 +64,8 @@
 #include <linux/gp2a.h>
 #endif
 
-#ifndef CONFIG_MSM_CAMERA
-#define CONFIG_MSM_CAMERA
-#endif
-
-#ifdef CONFIG_FORCE_FAST_CHARGE
-#include <linux/fastchg.h>
-#endif
-
 #define _CONFIG_MACH_JENA // Temporary flag
 #define _CONFIG_MACH_TREBON // Temporary flag
-#define ADSP_RPC_PROG           0x3000000a
 
 #define PMEM_KERNEL_EBI1_SIZE	0x3A000
 #define MSM_PMEM_AUDIO_SIZE	0x1F4000 //0x5B000
@@ -82,6 +73,14 @@
 #define BAHAMA_SLAVE_ID_QMEMBIST_ADDR   0x7B
 #define BAHAMA_SLAVE_ID_FM_REG 0x02
 #define FM_GPIO	83
+
+#ifdef CONFIG_ION_MSM
+#define MSM_ION_HEAP_NUM 4
+static struct platform_device ion_dev;
+static int msm_ion_camera_size;
+static int msm_ion_audio_size;
+static int msm_ion_sf_size;
+#endif
 
 #if (CONFIG_MACH_TREBON_HWREV == 0x0)
 #define GPIO_BLUETOOTH_LDO 82
@@ -1483,14 +1482,8 @@ void trebon_chg_connected(enum chg_type chgtype)
 
 	switch (chgtype) {
 	case USB_CHG_TYPE__SDP:
-#ifdef CONFIG_FORCE_FAST_CHARGE
-    	if (force_fast_charge == 1)
-			ret = msm_proc_comm(PCOM_CHG_USB_IS_CHARGER_CONNECTED, 
+		ret = msm_proc_comm(PCOM_CHG_USB_IS_PC_CONNECTED,
 				data1, data2);
-		else
-#endif
-		ret = msm_proc_comm(PCOM_CHG_USB_IS_PC_CONNECTED, 
-			data1, data2);
 		break;
 	case USB_CHG_TYPE__WALLCHARGER:
 		ret = msm_proc_comm(PCOM_CHG_USB_IS_CHARGER_CONNECTED,
@@ -1703,32 +1696,20 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 };
 
 #ifdef CONFIG_ARCH_MSM7X27A
-#define MSM_PMEM_MDP_SIZE       0x1800000 //25MB default: 0x1DD1000 (29MB)
-#define MSM7x25A_MSM_PMEM_MDP_SIZE       0x1500000 //22MB
-
-#define MSM_PMEM_ADSP_SIZE      0x900000 // ~9MB
-#define MSM_ION_VIDC_SIZE       0x1200000 // 18MB
-#define MSM7x25A_MSM_PMEM_ADSP_SIZE      0xB91000 //12MB
-
+#define MSM_PMEM_MDP_SIZE       0x1DD1000
+#define MSM_PMEM_ADSP_SIZE      0x1100000
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-#define MSM_FB_SIZE		0x1C2000
-#define MSM7x25A_MSM_FB_SIZE    0x1C2000
-#define MSM8x25_MSM_FB_SIZE	0x1C2000
+/* prim = 320 x 480 x 4(bpp) x 3(pages) */
+#define MSM_FB_SIZE             320 * 480 * 4 * 3
 #else
-#define MSM_FB_SIZE		0x1C2000
-#define MSM7x25A_MSM_FB_SIZE	0x12C000
-#define MSM8x25_MSM_FB_SIZE	0x1C2000
-#endif
-#endif
-
-#ifdef CONFIG_ION_MSM
-#define MSM_ION_HEAP_NUM        4
-static struct platform_device ion_dev;
-static int msm_ion_camera_size;
-static int msm_ion_audio_size;
-static int msm_ion_sf_size;
-#endif
-
+/* prim = 320 x 480 x 4(bpp) x 2(pages) */
+#define MSM_FB_SIZE             320 * 480 * 4 * 2
+#endif /* CONFIG_FB_MSM_TRIPLE_BUFFER */
+#else
+#define MSM_PMEM_MDP_SIZE       0x1DD1000
+#define MSM_PMEM_ADSP_SIZE      0x1000000
+#define MSM_FB_SIZE             0x195000
+#endif /* CONFIG_ARCH_MSM7X27A */
 
 static struct android_usb_platform_data android_usb_pdata = {
 	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
@@ -3618,7 +3599,7 @@ static void __init msm_msm7x2x_allocate_memory_regions(void)
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
 		size, addr, __pa(addr));
-		
+
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 	/* RAM Console can't use alloc_bootmem(), since that zeroes the
      * region */
@@ -3645,41 +3626,41 @@ static struct ion_co_heap_pdata co_ion_pdata = {
  * Don't swap the order unless you know what you are doing!
  */
 static struct ion_platform_data ion_pdata = {
-        .nr = MSM_ION_HEAP_NUM,
-        .has_outer_cache = 1,
-        .heaps = {
-                {
-                        .id        = ION_SYSTEM_HEAP_ID,
-                        .type        = ION_HEAP_TYPE_SYSTEM,
-                        .name        = ION_VMALLOC_HEAP_NAME,
-                },
+	.nr = MSM_ION_HEAP_NUM,
+	.has_outer_cache = 1,
+	.heaps = {
+		{
+			.id	= ION_SYSTEM_HEAP_ID,
+			.type	= ION_HEAP_TYPE_SYSTEM,
+			.name	= ION_VMALLOC_HEAP_NAME,
+		},
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-                /* PMEM_ADSP = CAMERA */
-                {
-                        .id        = ION_CAMERA_HEAP_ID,
-                        .type        = ION_HEAP_TYPE_CARVEOUT,
-                        .name        = ION_CAMERA_HEAP_NAME,
-                        .memory_type = ION_EBI_TYPE,
-                        .extra_data = (void *)&co_ion_pdata,
-                },
-                /* PMEM_AUDIO */
-                {
-                        .id        = ION_AUDIO_HEAP_ID,
-                        .type        = ION_HEAP_TYPE_CARVEOUT,
-                        .name        = ION_AUDIO_HEAP_NAME,
-                        .memory_type = ION_EBI_TYPE,
-                        .extra_data = (void *)&co_ion_pdata,
-                },
-                /* PMEM_MDP = SF */
-                {
-                        .id        = ION_SF_HEAP_ID,
-                        .type        = ION_HEAP_TYPE_CARVEOUT,
-                        .name        = ION_SF_HEAP_NAME,
-                        .memory_type = ION_EBI_TYPE,
-                        .extra_data = (void *)&co_ion_pdata,
-                },
+		/* PMEM_ADSP = CAMERA */
+		{
+			.id	= ION_CAMERA_HEAP_ID,
+			.type	= ION_HEAP_TYPE_CARVEOUT,
+			.name	= ION_CAMERA_HEAP_NAME,
+			.memory_type = ION_EBI_TYPE,
+			.extra_data = (void *)&co_ion_pdata,
+		},
+		/* PMEM_AUDIO */
+		{
+			.id	= ION_AUDIO_HEAP_ID,
+			.type	= ION_HEAP_TYPE_CARVEOUT,
+			.name	= ION_AUDIO_HEAP_NAME,
+			.memory_type = ION_EBI_TYPE,
+			.extra_data = (void *)&co_ion_pdata,
+		},
+		/* PMEM_MDP = SF */
+		{
+			.id	= ION_SF_HEAP_ID,
+			.type	= ION_HEAP_TYPE_CARVEOUT,
+			.name	= ION_SF_HEAP_NAME,
+			.memory_type = ION_EBI_TYPE,
+			.extra_data = (void *)&co_ion_pdata,
+		},
 #endif
-        }
+	}
 };
 
 static struct platform_device ion_dev = {
@@ -3700,36 +3681,25 @@ static struct memtype_reserve msm7x27a_reserve_table[] __initdata = {
 	},
 };
 
-#ifdef CONFIG_ANDROID_PMEM
-#if !defined(CONFIG_MSM_MULTIMEDIA_USE_ION) || defined(CONFIG_MSM_ADSP_USE_PMEM)
-static struct android_pmem_platform_data *pmem_pdata_array[] __initdata = {
-#ifdef CONFIG_MSM_ADSP_USE_PMEM
-		&android_pmem_adsp_pdata,
-#endif
-#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
-		&android_pmem_audio_pdata,
-		&android_pmem_pdata,
-#endif
-};
-#endif
-#endif
-
 static void __init size_pmem_devices(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
-#ifdef CONFIG_MSM_ADSP_USE_PMEM
-	android_pmem_adsp_pdata.size = pmem_adsp_size;
-#endif
 #ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
+	android_pmem_adsp_pdata.size = pmem_adsp_size;
 	android_pmem_pdata.size = pmem_mdp_size;
 	android_pmem_audio_pdata.size = pmem_audio_size;
-
 #endif
+#endif
+
+#ifdef CONFIG_ION_MSM
+	msm_ion_camera_size = pmem_adsp_size;
+	msm_ion_audio_size = (MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE);
+	msm_ion_sf_size = pmem_mdp_size;
 #endif
 }
 
 #ifdef CONFIG_ANDROID_PMEM
-#if !defined(CONFIG_MSM_MULTIMEDIA_USE_ION) || defined(CONFIG_MSM_ADSP_USE_PMEM)
+#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 {
 	msm7x27a_reserve_table[p->memory_type].size += p->size;
@@ -3740,11 +3710,10 @@ static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 static void __init reserve_pmem_memory(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
-#if !defined(CONFIG_MSM_MULTIMEDIA_USE_ION) || defined(CONFIG_MSM_ADSP_USE_PMEM)
-	unsigned int i;
-	for (i = 0; i < ARRAY_SIZE(pmem_pdata_array); ++i)
-		reserve_memory_for(pmem_pdata_array[i]);
-
+#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
+	reserve_memory_for(&android_pmem_adsp_pdata);
+	reserve_memory_for(&android_pmem_pdata);
+	reserve_memory_for(&android_pmem_audio_pdata);
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += pmem_kernel_ebi1_size;
 #endif
 #endif
@@ -3765,7 +3734,6 @@ static void __init reserve_ion_memory(void)
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_camera_size;
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_audio_size;
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_sf_size;
-	msm7x27a_reserve_table[MEMTYPE_EBI1].size += 1;
 #endif
 }
 
